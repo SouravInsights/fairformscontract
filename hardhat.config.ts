@@ -1,21 +1,32 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import * as dotenv from "dotenv";
 
-require("dotenv").config();
+dotenv.config();
 
 const config: HardhatUserConfig = {
-  solidity: {
-    version: "0.8.23",
-  },
+  solidity: "0.8.20",
   networks: {
-    // for testnet
-    "base-sepolia": {
-      url: process.env.BASE_SEPOLIA_URL,
-      accounts: [process.env.PRIVATE_KEY as string],
-      gasPrice: 1000000000,
+    baseSepolia: {
+      url: process.env.BASE_SEPOLIA_URL || "https://sepolia.base.org",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
   },
-  defaultNetwork: "hardhat",
+  etherscan: {
+    apiKey: {
+      baseSepolia: process.env.BASESCAN_API_KEY || "",
+    },
+    customChains: [
+      {
+        network: "baseSepolia",
+        chainId: 84532,
+        urls: {
+          apiURL: "https://api-sepolia.basescan.org/api",
+          browserURL: "https://sepolia.basescan.org",
+        },
+      },
+    ],
+  },
 };
 
 export default config;

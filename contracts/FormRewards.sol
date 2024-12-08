@@ -3,52 +3,37 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract FormToken is ERC20, Ownable, ReentrancyGuard {
-    mapping(address => bool) public formOperators;
-    mapping(address => uint256) public formRewardLimits;
+contract FormRewards is ERC20, Ownable {
+    // Reward amount per submission in wei
+    uint256 public rewardAmount = 100 * 10**18; // Default 100 tokens
     
-    event FormOperatorAdded(address operator);
-    event FormOperatorRemoved(address operator);
-    event RewardLimitSet(address form, uint256 limit);
-    event RewardSent(address to, uint256 amount, address form);
+    // Track form submissions to prevent double claiming
+    mapping(bytes32 => bool) public claimedSubmissions;
+
+    event RewardClaimed(address user, uint256 amount, bytes32 submissionId);
 
     constructor() ERC20("FormFlow", "FORM") Ownable(msg.sender) {
-        _mint(msg.sender, 1000000 * 10**decimals()); // Mint 1M tokens
+        // Mint 1M tokens to contract itself for rewards
+        _mint(address(this), 1_000_000 * 10**decimals());
     }
 
-    modifier onlyOperator() {
-        require(formOperators[msg.sender], "Not a form operator");
-        _;
+    function setRewardAmount(uint256 _rewardAmount) external onlyOwner {
+        rewardAmount = _rewardAmount;
     }
 
-    function addFormOperator(address operator) external onlyOwner {
-        formOperators[operator] = true;
-        emit FormOperatorAdded(operator);
-    }
+    function claimReward(bytes32 submissionId) external {
+        require(!claimedSubmissions[submissionId], "Already claimed");
+        require(balanceOf(address(this)) >= rewardAmount, "Insufficient rewards");
 
-    function removeFormOperator(address operator) external onlyOwner {
-        formOperators[operator] = false;
-        emit FormOperatorRemoved(operator);
-    }
-
-    function setFormRewardLimit(address form, uint256 limit) external onlyOwner {
-        formRewardLimits[form] = limit;
-        emit RewardLimitSet(form, limit);
-    }
-
-    function sendReward(address to, uint256 amount) external nonReentrant onlyOperator {
-        require(amount <= formRewardLimits[msg.sender], "Reward exceeds limit");
-        require(balanceOf(address(this)) >= amount, "Insufficient reward pool");
+        claimedSubmissions[submissionId] = true;
+        _transfer(address(this), msg.sender, rewardAmount);
         
-        _transfer(address(this), to, amount);
-        emit RewardSent(to, amount, msg.sender);
+        emit RewardClaimed(msg.sender, rewardAmount, submissionId);
     }
 
-    // Owner can withdraw tokens from the reward pool
-    function withdrawRewardPool(uint256 amount) external onlyOwner {
-        require(balanceOf(address(this)) >= amount, "Insufficient balance");
-        _transfer(address(this), owner(), amount);
+    // Function to check if user can access form (has minimum tokens)
+    function canAccessForm(address user, uint256 minTokens) external view returns (bool) {
+        return balanceOf(user) >= minTokens;
     }
 }
